@@ -1,0 +1,39 @@
+# === Stage 2: Build the Frontend ===
+FROM node:18 AS frontend
+WORKDIR /app/frontend
+
+# Copy frontend files
+COPY ./frontend /app/frontend/
+
+# Install dependencies and build the frontend
+RUN npm install && npm run build
+
+# === Stage 3: Final Image with Backend and Frontend ===
+FROM python:3.11-slim
+WORKDIR /app
+
+ENV PYTHONPATH=/app
+
+# Install Redis, Supervisor, and Node.js
+RUN apt-get update && apt-get install -y nodejs npm redis supervisor
+
+# Copy the requirements so that Docker can cache the installation
+COPY ./backend/requirements.txt /app/backend/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+
+# Copy the backend files
+COPY ./backend /app/backend
+
+# Copy built frontend
+# COPY --from=frontend /app/frontend/dist /app/frontend/dist
+
+# Add supervisor configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose necessary ports
+EXPOSE 8000 3000 6379
+
+# Run Supervisor to manage services
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
